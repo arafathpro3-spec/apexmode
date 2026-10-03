@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Catalogue</title><meta name="theme-color" content="#2F3F86">
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--tx:#14171f;--mut:#667085;--bd:#e3e6ec;--brand:#2F3F86;--on:#fff;--wa:#128c4a}
+@media(prefers-color-scheme:dark){:root{--bg:#10131a;--card:#1a1f2b;--tx:#f1f3f8;--mut:#9aa3b5;--bd:#2b3242}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding-bottom:84px}
+header{background:var(--brand);color:var(--on);padding:14px 16px;position:sticky;top:0;z-index:5}
+header b{font-size:18px;display:block}header small{opacity:.85}
+main{max-width:760px;margin:0 auto;padding:14px 16px}
+h2{font-size:17px;margin:18px 0 8px;display:flex;align-items:center}h2 a{margin-left:auto;font-size:14px;color:var(--brand);font-weight:600;cursor:pointer;text-decoration:none}
+@media(prefers-color-scheme:dark){h2 a{color:#9db0ff}}
+.row{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x proximity}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}@media(min-width:560px){.grid{grid-template-columns:repeat(3,1fr)}}
+.it{background:var(--card);border:1px solid var(--bd);border-radius:14px;overflow:hidden;position:relative;display:flex;flex-direction:column;cursor:pointer}
+.row .it{flex:0 0 150px;scroll-snap-align:start}
+.ph{aspect-ratio:1;background:var(--bd) center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--mut);font-size:28px}
+.inf{padding:8px 46px 10px 10px}.inf b{display:block;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pr{font-weight:700;margin-top:2px}
+.add{position:absolute;right:8px;bottom:8px;width:34px;height:34px;border-radius:50%;border:0;background:var(--brand);color:var(--on);font-size:22px;line-height:1;cursor:pointer}
+.off{opacity:.55}.off .add{display:none}.badge{position:absolute;left:8px;top:8px;background:#000a;color:#fff;border-radius:8px;padding:2px 8px;font-size:12px}
+input,select,textarea{width:100%;padding:11px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--tx);font:inherit}
+button.p,a.p{display:block;width:100%;padding:13px;border:0;border-radius:12px;background:var(--brand);color:var(--on);font-weight:600;font-size:15px;font-family:inherit;text-align:center;text-decoration:none;cursor:pointer}
+a.wa,button.wa{background:var(--wa);color:#fff}button.g{background:var(--bd);color:var(--tx)}
+.msg{text-align:center;color:var(--mut);padding:40px 10px}
+#bar{position:fixed;left:0;right:0;bottom:0;padding:10px 16px;background:var(--card);border-top:1px solid var(--bd);display:none;z-index:6}
+#bar button{max-width:728px;margin:0 auto}
+dialog{border:0;border-radius:16px;padding:0;width:min(520px,94vw);max-height:90vh;background:var(--card);color:var(--tx)}dialog::backdrop{background:#0008}
+.dl{padding:16px;overflow:auto;max-height:90vh}.big{width:100%;aspect-ratio:1;background:var(--bd) center/cover no-repeat;border-radius:12px;margin-bottom:10px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}.chips button{padding:8px 14px;border-radius:20px;border:1px solid var(--bd);background:var(--card);color:var(--tx);font:inherit;cursor:pointer}.chips button.on{background:var(--brand);color:var(--on);border-color:var(--brand)}
+.qt{display:flex;align-items:center;gap:12px;margin:10px 0}.qt button{width:38px;height:38px;border-radius:50%;border:1px solid var(--bd);background:var(--card);color:var(--tx);font-size:20px;cursor:pointer}
+.ln{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--bd)}.ln .ph{width:48px;aspect-ratio:1;border-radius:8px;flex:none;font-size:16px}.ln div.t{flex:1;min-width:0}
+footer{text-align:center;color:var(--mut);padding:24px 16px}footer a{color:var(--wa);font-weight:600}
+</style></head><body>
+<header><b id="hn">Catalogue</b><small id="hs"></small></header>
+<main id="m"><div class="msg">Chargement du catalogue…</div></main>
+<div id="bar"><button class="p" id="bb"></button></div>
+<dialog id="dg"></dialog>
+<script type="module">
+const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const F=n=>Math.round(n||0).toLocaleString('fr-FR')+' F CFA';
+const sid=new URLSearchParams(location.search).get('s')||'';
+const UL={m:'le mètre',pce:'',paire:'la paire',lot:'le lot'};
+let meta=null,items=[],cart=[];const ck='apex_cart_'+sid;
+try{cart=JSON.parse(localStorage.getItem(ck))||[]}catch(e){}
+const keep=()=>{try{localStorage.setItem(ck,JSON.stringify(cart))}catch(e){}};
+const msg=t=>{$('#m').innerHTML=`<div class="msg">${t}</div>`};
+const phone=p=>{let d=String(p||'').replace(/\D/g,'');if(!d)return '';if(!d.startsWith('229')&&d.length<=10)d='229'+d;return d};
+try{
+  if(!sid)throw new Error('lien');
+  const cfg=(await import('./firebase-config.js')).default;
+  const V='https://www.gstatic.com/firebasejs/10.14.1/';
+  const [A,B]=await Promise.all([import(V+'firebase-app.js'),import(V+'firebase-firestore.js')]);
+  const db=B.getFirestore(A.initializeApp(cfg));
+  const [m,l]=await Promise.all([B.getDoc(B.doc(db,'catalogs',sid)),B.getDocs(B.collection(db,'catalogs',sid,'items'))]);
+  if(!m.exists()||!m.data().on)throw new Error('absent');
+  meta=m.data();items=l.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.o||0)-(b.o||0));
+}catch(e){msg(e.message=='absent'||e.message=='lien'?'Ce catalogue n’est pas disponible.':'Impossible de charger le catalogue. Vérifiez votre connexion et réessayez.');throw e}
+document.title='Catalogue – '+(meta.n||'');$('#hn').textContent=meta.n||'Catalogue';$('#hs').textContent='Catalogue'+(meta.addr?' – '+meta.addr:'');
+if(/^#[0-9a-f]{6}$/i.test(meta.color||'')){const c=meta.color,n=parseInt(c.slice(1),16),L=.299*(n>>16)+.587*((n>>8)&255)+.114*(n&255);document.documentElement.style.setProperty('--brand',c);document.documentElement.style.setProperty('--on',L>150?'#111':'#fff');$('meta[name=theme-color]').content=c}
+const cats=()=>{const o={};items.forEach(i=>{(o[i.cat||'Articles']=o[i.cat||'Articles']||[]).push(i)});return o};
+let cur='';
+const tile=i=>`<div class="it ${i.ok?'':'off'}" data-i="${esc(i.id)}"><div class="ph" ${i.img?`style="background-image:url('${esc(i.img)}')"`:''}>${i.img?'':'◻'}</div>${i.ok?'':'<span class="badge">Épuisé</span>'}<div class="inf"><b>${esc(i.n)}</b><div class="pr">${F(i.pr)}</div></div><button class="add" data-a="${esc(i.id)}" aria-label="Ajouter">+</button></div>`;
+function show(){
+  const C=cats();let h='';
+  if(!items.length){msg('Aucun article pour le moment.');return}
+  if(cur){h=`<h2>${esc(cur)}<a id="back">← Tout le catalogue</a></h2><div class="grid">${(C[cur]||[]).map(tile).join('')}</div>`}
+  else h=`<input id="q" placeholder="Chercher un article" style="margin-bottom:6px"><div id="res"></div>`;
+  $('#m').innerHTML=h+`<footer>Vous cherchez autre chose ?<br>${phone(meta.tel)?`<a href="https://wa.me/${phone(meta.tel)}?text=${encodeURIComponent('Bonjour, je cherche autre chose que ce qui est dans votre catalogue.')}" target="_blank" rel="noopener">Envoyez un message à ${esc(meta.n||'la boutique')}</a>`:esc(meta.n||'')}</footer>`;
+  if(cur)$('#back').onclick=()=>{cur='';show()};
+  else{const f=()=>{const q=($('#q').value||'').toLowerCase().trim();
+    if(q){const L=items.filter(i=>(i.n+' '+i.cat+' '+i.ref).toLowerCase().includes(q));$('#res').innerHTML=L.length?`<div class="grid">${L.map(tile).join('')}</div>`:'<div class="msg">Aucun résultat.</div>'}
+    else $('#res').innerHTML=Object.entries(C).map(([k,l])=>`<h2>${esc(k)}${l.length>2?`<a data-c="${esc(k)}">Voir tout</a>`:''}</h2><div class="row">${l.slice(0,8).map(tile).join('')}</div>`).join('');bind()};
+    $('#q').oninput=f;f()}
+  bind();
+}
+function bind(){
+  document.querySelectorAll('[data-c]').forEach(a=>a.onclick=()=>{cur=a.dataset.c;show();scrollTo(0,0)});
+  document.querySelectorAll('.it').forEach(t=>t.onclick=e=>{const i=items.find(x=>x.id==t.dataset.i);if(!i)return;if(e.target.dataset.a!==undefined){e.stopPropagation();if(i.sz)detail(i);else add(i,'',1)}else detail(i)});
+}
+const lines=()=>cart.map(c=>({...c,i:items.find(x=>x.id==c.id)})).filter(c=>c.i);
+function bar(){const L=lines(),n=L.reduce((a,c)=>a+c.q,0),T=L.reduce((a,c)=>a+c.q*c.i.pr,0);$('#bar').style.display=n?'block':'none';$('#bb').textContent=`Voir le panier (${n}) – ${F(T)}`}
+function add(i,sz,q){const e=cart.find(c=>c.id==i.id&&c.sz==sz);if(e)e.q+=q;else cart.push({id:i.id,sz,q});keep();bar();const b=$('#bb');b.animate([{transform:'scale(1.04)'},{transform:'scale(1)'}],200)}
+function detail(i){
+  let sz='',q=1;const d=$('#dg'),S=i.sz?i.sz.split(/[,;\/]+/).map(x=>x.trim()).filter(Boolean):[];
+  d.innerHTML=`<div class="dl">${i.img?`<div class="big" style="background-image:url('${esc(i.img)}')"></div>`:''}<h3 style="margin:0">${esc(i.n)}</h3><div class="pr" style="font-size:18px;margin:4px 0">${F(i.pr)} ${UL[i.u]?'<small>('+UL[i.u]+')</small>':''}</div>${i.d?`<p>${esc(i.d)}</p>`:''}
+  ${S.length?`<label>Taille</label><div class="chips">${S.map(x=>`<button data-z="${esc(x)}">${esc(x)}</button>`).join('')}</div>`:''}
+  ${i.ok?`<div class="qt"><button id="mn">−</button><b id="qv">1</b><button id="pl">+</button></div><button class="p" id="ad">Ajouter au panier</button>`:'<p><b>Article épuisé pour le moment.</b></p>'}
+  <button class="p g" style="margin-top:8px" id="cl">Fermer</button></div>`;
+  d.showModal();$('#cl').onclick=()=>d.close();
+  d.querySelectorAll('[data-z]').forEach(b=>b.onclick=()=>{sz=b.dataset.z;d.querySelectorAll('[data-z]').forEach(x=>x.classList.toggle('on',x==b))});
+  if(i.ok){$('#mn').onclick=()=>{q=Math.max(1,q-1);$('#qv').textContent=q};$('#pl').onclick=()=>{q++;$('#qv').textContent=q};
+    $('#ad').onclick=()=>{if(S.length&&!sz){alert('Choisissez une taille.');return}add(i,sz,q);d.close()}}
+}
+function cartDlg(){
+  const d=$('#dg'),L=lines(),T=L.reduce((a,c)=>a+c.q*c.i.pr,0);
+  d.innerHTML=`<div class="dl"><h3 style="margin-top:0">Mon panier</h3>${L.map((c,k)=>`<div class="ln"><div class="ph" ${c.i.img?`style="background-image:url('${esc(c.i.img)}')"`:''}></div><div class="t"><b>${esc(c.i.n)}</b><br><small>${c.sz?'Taille '+esc(c.sz)+' – ':''}${F(c.i.pr)}</small></div><div class="qt" style="margin:0"><button data-d="${k}">−</button><b>${c.q}</b><button data-u="${k}">+</button></div></div>`).join('')}
+  <div class="ln" style="border:0"><b class="t">Total</b><b>${F(T)}</b></div>
+  <label>Votre nom</label><input id="nm" autocomplete="name"><label style="display:block;margin-top:8px">Message (facultatif)</label><input id="nt" placeholder="Adresse de livraison, précision…">
+  <button class="p wa" id="go" style="margin-top:12px">Envoyer la commande sur WhatsApp</button><button class="p g" id="cl" style="margin-top:8px">Continuer mes achats</button></div>`;
+  d.showModal();$('#cl').onclick=()=>d.close();
+  const fix=()=>{const L2=cart.filter(c=>c.q>0);cart=L2;keep();bar();if(!cart.length)d.close();else cartDlg()};
+  d.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{cart[+b.dataset.d].q--;fix()});
+  d.querySelectorAll('[data-u]').forEach(b=>b.onclick=()=>{cart[+b.dataset.u].q++;fix()});
+  $('#go').onclick=()=>{
+    const nm=$('#nm').value.trim(),nt=$('#nt').value.trim(),tel=phone(meta.tel);
+    if(!tel){alert("Cette boutique n'a pas encore indiqué de numéro WhatsApp.");return}
+    const t=`Bonjour ${meta.n||''}, je souhaite commander :\n`+lines().map(c=>`• ${c.q} x ${c.i.n}${c.sz?' (taille '+c.sz+')':''} – ${F(c.q*c.i.pr)}`).join('\n')+`\nTotal : ${F(T)}`+(nm?`\nNom : ${nm}`:'')+(nt?`\n${nt}`:'');
+    window.open('https://wa.me/'+tel+'?text='+encodeURIComponent(t),'_blank');
+  };
+}
+$('#bb').onclick=cartDlg;
+show();bar();
+</script></body></html>
